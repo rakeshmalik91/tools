@@ -1,0 +1,310 @@
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"> 
+
+		<title>Property File Diff</title>
+
+		<meta name="title" content="Property File Diff">
+		<meta name="author" content="Rakesh Malik">
+		<meta name="description" content="Property File Diff">
+		<link rel="icon" type="image/png" href="icon.png">
+		<link rel="shortcut icon" type="image/x-icon" href="icon.png">
+		<link rel="apple-touch-icon" href="icon.png">
+
+		<style type="text/css">
+			body {
+				background-color: #181a2a;
+			}
+
+			h1 {
+				margin-left: 20px;
+				color: #b4bc92;
+			}
+
+			table, tr, td, th {
+				border: none;
+				width: auto;
+				margin: 0;
+				padding: 0;
+				width: 100%;
+			}
+			table {
+				margin: 20px;
+				width: calc(100% - 40px);
+			}
+
+			textarea, div.output {
+				width: 100%;
+				height: calc(100vh - 100px);
+				display: inline-block;
+				float: left;
+				background-color: #15161f;
+				color: #e3e9ca;
+				font-family: monospace;
+				font-size: 12px;
+				overflow: auto;
+				margin: 0;
+			}
+			textarea {
+				border: none;
+				resize: none;
+				padding: 5px 12px;
+			}
+			div.output {
+				padding: 0;
+				border: 1px solid #e3e9ca;
+			}
+			div.output div {
+				font-size: 12px;
+				height: 12px;
+				padding-top: 2px;
+				padding-bottom: 2px;
+			}
+			div.output div.added {
+				background-color: #33654f;
+			}
+			div.output div.removed {
+				background-color: #4a2c2c;
+			}
+			div.output div.modified {
+				background-color: #595933;
+			}
+			div.output div.blank {
+				background-color: #000000;
+			}
+			div.output div.comment {
+				color: #999999;
+			}
+			div.output div:before {
+				content: "--";
+				padding-right: 12px;
+				color: #333333;
+			}
+			div.output div.blank:before {
+				content: "";
+			}
+			div.output div.duplicate:before {
+				content: "!!";
+				color: red;
+			}
+
+			button {
+				display: block;
+				background-color: #61a645;
+				color: #e8ff86;
+				padding: 10px;
+				margin: 10px;
+				border: none;
+				border-radius: 5px;
+				width: calc(100% - 20px);
+			}
+			button:hover {
+				background-color: #e8ff86;
+				color: black;
+			}
+			button:active {
+				background-color: white;
+				color: black;
+			}
+			button:disabled {
+				background-color: #777777;
+				color: #aaaaaa;
+			}
+
+			.credits {
+				color: grey;
+				font-size: 10px;
+				text-align:center;
+			}
+			.credits a {
+				color: #7575d8;
+			}
+
+			.hide {
+				display: none !important;
+			}
+		</style>
+
+		<script>
+			function escapeHtml(unsafe) {
+			    return unsafe
+			         .replace(/&/g, "&amp;")
+			         .replace(/</g, "&lt;")
+			         .replace(/>/g, "&gt;")
+			         .replace(/"/g, "&quot;")
+			         .replace(/'/g, "&#039;");
+			}
+
+			function getProp(line) {
+				return escapeHtml(line.split('=')[0].trim());
+			}
+
+			function trim(line) {
+				return escapeHtml(line.split('=').map(token => token.trim()).join('='));
+			}
+
+			var editMode = true;
+
+			function diff() {
+				var file1 = document.getElementById('file1-text').value.trim().split('\n');
+				var file2 = document.getElementById('file2-text').value.trim().split('\n');
+
+				var file1Props = new Set(document.getElementById('file1-text').value.split('\n').map(line => getProp(line)).filter(line => line));
+				var file2Props = new Set(document.getElementById('file2-text').value.split('\n').map(line => getProp(line)).filter(line => line));
+
+				var file1PropValues = new Set(document.getElementById('file1-text').value.split('\n').map(line => trim(line)).filter(line => line));
+				var file2PropValues = new Set(document.getElementById('file2-text').value.split('\n').map(line => trim(line)).filter(line => line));
+
+				var dupli1 = new Set(), dupli2 = new Set();
+
+				var file1Html = '', file2Html = '';
+				for(var i1 = 0, i2 = 0; i1 < file1.length || i2 < file2.length; ) {
+
+					var line1 = (i1 < file1.length) ? trim(file1[i1]) : '';
+					var line2 = (i2 < file2.length) ? trim(file2[i2]) : '';
+
+					var prop1 = getProp(line1), prop2 = getProp(line2);
+					var flags1 = null, flags2 = null;
+
+					if(line1 == line2) {
+						flags1 = [];				i1++;
+						flags2 = [];				i2++;
+					} else if(prop1 == prop2) {
+						flags1 = ['modified'];		i1++;
+						flags2 = ['modified'];		i2++;
+					} else if(line1.startsWith('#') && line2.startsWith('#')) {
+						if(line1 == line2) {
+							flags1 = [];				i1++;
+							flags2 = [];				i2++;
+						} else {
+							flags1 = ['modified'];		i1++;
+							flags2 = ['modified'];		i2++;
+						}
+					} else if(!line1 && line2 && i1 < file1.length) {
+						flags1 = [];				i1++;
+					} else if(line1 && !line2 && i2 < file2.length) {
+						flags2 = [];				i2++;
+					} else if(prop1 && !file2Props.has(prop1)) {
+						flags1 = ['removed'];		i1++;
+					} else if(prop2 && !file1Props.has(prop2)) {
+						flags2 = ['added'];			i2++;
+					} else if(line1 && !file2PropValues.has(line1)) {
+						flags1 = ['modified'];		i1++;
+					} else if(line2 && !file1PropValues.has(line2)) {
+						flags2 = ['modified'];		i2++;
+					} else {
+						flags1 = [];				i1++;
+						flags2 = [];				i2++;
+					}
+
+					if(flags1 != null) {
+						if(line1.startsWith('#')) {
+							flags1.push('comment');
+						} else if(prop1 && dupli1.has(prop1)) {
+							flags1.push('duplicate');
+						}
+						dupli1.add(prop1);
+					}
+
+					if(flags2 != null) {
+						if(line2.startsWith('#')) {
+							flags2.push('comment');
+						} else if(prop2 && dupli2.has(prop2)) {
+							flags2.push('duplicate');
+						}
+						dupli2.add(prop2);
+					}
+
+					file1Html += makeDiv(line1, flags1); 
+					file2Html += makeDiv(line2, flags2);
+				}
+
+				document.getElementById('file1-output').innerHTML = file1Html;
+				document.getElementById('file2-output').innerHTML = file2Html;
+
+				for(const file of ['file1', 'file2']) {
+					document.getElementById(file + "-output").classList.remove('hide');
+					document.getElementById(file + "-text").classList.add('hide');
+				}
+				document.getElementById('edit-button').removeAttribute('disabled');
+				document.getElementById('diff-button').setAttribute('disabled', true);
+
+				editMode = false;
+			}
+
+			function makeDiv(line, flags) {
+				if(flags == null) {
+					return "<div class='blank'></div>";
+				} else {
+					return "<div class='" + flags.join(' ') + "'>" + line + "\n</div>";
+				}
+			}
+
+			function edit() {
+				for(const file of ['file1', 'file2']) {
+					document.getElementById(file + "-output").classList.add('hide');
+					document.getElementById(file + "-text").classList.remove('hide');
+				}
+				document.getElementById('edit-button').setAttribute('disabled', true);
+				document.getElementById('diff-button').removeAttribute('disabled');
+				editMode = true;
+			}
+
+			function swap() {
+				var file1Content = document.getElementById('file1-text').value.trim();
+				var file2Content = document.getElementById('file2-text').value.trim();
+				document.getElementById('file1-text').value = file2Content;
+				document.getElementById('file2-text').value = file1Content;
+				if(!editMode) diff();
+			}
+		</script>
+	</head>
+
+	<body>
+
+		<h1>Property File Difference</h1>
+
+		<table>
+			<tr>
+				<td style='width: 45%;'>
+					<textarea id='file1-text'># Some prop
+prop1.subprop1=ABC
+prop1.subprop2=XYZ
+prop1.subprop3=123
+
+# Some more prop
+prop1.subprop4=1
+prop1.subprop5=2</textarea>
+					<div class='output hide' id='file1-output'></div>
+				</td>
+				<td style='width: 10%;'>
+					<button id='edit-button' onclick='edit()' disabled>Edit</button>
+					<button id='diff-button' onclick='diff()'>Show Difference</button>
+					<button id='swap-button' onclick='swap()'>Swap</button>
+					<div class='credits'>
+						<br/>
+						© 2024 Rakesh Malik
+						<br/>
+						<br/>
+						<a href="https://github.com/rakeshmalik91/tools/issues" target="_blank" disabled>Report a Bug</a>
+						<br/>
+						<br/>
+						<a href="index.html" disabled>Home</a>
+					</div>
+				</td>
+				<td style='width: 45%;'>
+					<textarea id='file2-text'># Some prop
+prop1.subprop1=ABC
+prop1.subprop2=PQR
+
+# Some more prop
+prop1.subprop4=1
+prop1.subprop5=2
+prop1.subprop6=3</textarea>
+					<div class='output hide' id='file2-output'></div>
+				</td>
+			</tr>
+		</table>
+	</body>
+</html>
