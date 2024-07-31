@@ -57,11 +57,13 @@
 				border: 1px solid #e3e9ca;
 			}
 			div.output div {
+				width: calc(45vw - 40px);
 				font-size: 12px;
-				height: 12px;
-				padding-top: 2px;
-				padding-bottom: 2px;
+/*				height: 12px;*/
+				padding-top: 1px;
+				padding-bottom: 1px;
 				padding-left: 8px;
+				overflow-wrap: anywhere;
 			}
 			div.output div.added {
 				background-color: #33654f;
@@ -94,6 +96,9 @@
 			div.output div.duplicate:before {
 				content: "DUP";
 				color: red;
+			}
+			div.output div.multiline-value:before {
+				content: "\\--";
 			}
 			
 			div.output span.key {
@@ -166,15 +171,47 @@
 
 			var editMode = true;
 
+			// merges multiline values
+			function getLines(filename) {
+				var content = document.getElementById(filename).value.trim().split(/\n/);
+				var lines = [];
+				var lastLine = '';
+				for(var i = 0; i < content.length; i++) {
+					if(content[i].trim().startsWith('#')) {
+						lines.push(content[i]);
+						continue;
+					}
+					lastLine += content[i];
+					if(!lastLine.trim().endsWith('\\')) {
+						lines.push(lastLine);
+						lastLine = '';
+					} else {
+						lastLine += '\n';
+					}
+				}
+				return lines;
+			}
+
 			function diff() {
-				var file1 = document.getElementById('file1-text').value.trim().split('\n');
-				var file2 = document.getElementById('file2-text').value.trim().split('\n');
+				var file1 = getLines('file1-text');
+				console.log("file1 = ", file1);
+				var file2 = getLines('file2-text');
+				console.log("file2 = ", file2);
 
-				var file1Props = new Set(document.getElementById('file1-text').value.split('\n').map(line => getProp(line)).filter(line => line));
-				var file2Props = new Set(document.getElementById('file2-text').value.split('\n').map(line => getProp(line)).filter(line => line));
+				var file1PropValues = new Set(file1.map(line => trim(line)).filter(line => line && !line.match(/^\s*#.*/)));
+				console.log("file1PropValues = ", file1PropValues);
+				var file2PropValues = new Set(file2.map(line => trim(line)).filter(line => line && !line.match(/^\s*#.*/)));
+				console.log("file2PropValues = ", file2PropValues);
 
-				var file1PropValues = new Set(document.getElementById('file1-text').value.split('\n').map(line => trim(line)).filter(line => line));
-				var file2PropValues = new Set(document.getElementById('file2-text').value.split('\n').map(line => trim(line)).filter(line => line));
+				var file1Props = new Set([...file1PropValues].map(line => getProp(line)));
+				console.log("file1Props = ", file1Props);
+				var file2Props = new Set([...file2PropValues].map(line => getProp(line)));
+				console.log("file2Props = ", file2Props);
+
+				var file1Comments = new Set(file1.map(line => trim(line)).filter(line => line && line.match(/^\s*#.*/)));
+				console.log("file1Comments = ", file1Comments);
+				var file2Comments = new Set(file2.map(line => trim(line)).filter(line => line && line.match(/^\s*#.*/)));
+				console.log("file2Comments = ", file2Comments);
 
 				var dupli1 = new Set(), dupli2 = new Set();
 
@@ -193,21 +230,21 @@
 					} else if(prop1 == prop2) {
 						flags1 = ['modified'];		i1++;
 						flags2 = ['modified'];		i2++;
-					} else if(line1.startsWith('#') && line2.startsWith('#')) {
-						if(line1 == line2) {
+					} else if(line1.match(/^\s*#.*/) && line2.match(/^\s*#.*/)) {
+						if(line1.trim() == line2.trim()) {
 							flags1 = [];				i1++;
 							flags2 = [];				i2++;
 						} else {
 							flags1 = ['modified'];		i1++;
 							flags2 = ['modified'];		i2++;
 						}
-					} else if(prop1 && !file2Props.has(prop1)) {
+					} else if(prop1 && (prop1.match(/^\s*#.*/) ? !file2Comments.has(prop1) : !file2Props.has(prop1))) {
 						flags1 = ['removed'];		i1++;
-					} else if(prop2 && !file1Props.has(prop2)) {
+					} else if(prop2 && (prop2.match(/^\s*#.*/) ? !file1Comments.has(prop2) : !file1Props.has(prop2))) {
 						flags2 = ['added'];			i2++;
-					} else if(line1 && !file2PropValues.has(line1)) {
+					} else if(line1 && !line1.match(/^\s*#.*/) && !file2PropValues.has(line1)) {
 						flags1 = ['modified'];		i1++;
-					} else if(line2 && !file1PropValues.has(line2)) {
+					} else if(line2 && !line2.match(/^\s*#.*/) && !file1PropValues.has(line2)) {
 						flags2 = ['modified'];		i2++;
 					} else if(!line1 && line2 && i1 < file1.length) {
 						flags1 = [];				i1++;
@@ -259,12 +296,23 @@
 				} else if(!line || line.startsWith("#")) {
 					return "<div class='" + flags.join(' ') + "'>" + line + "\n</div>";
 				} else {
-					var parts = line.split('=');
-					return "<div class='" + flags.join(' ') + "'>" 
-						+ "<span class='key'>" + parts[0] + "</span>"
+					var parts = line.split(/=|:/)
+					var key = parts.shift();
+					var valuelines = parts.join('=').split(/\n/);
+					html = "<div class='" + flags.join(' ') + "'>" 
+						+ "<span class='key'>" + key + "</span>"
 						+ "<span class='equals'>=</span>"
-						+ "<span class='value'>" + parts[1] + "</span>"
+						+ "<span class='value'>" + valuelines[0] + "</span>"
 						+ "\n</div>";
+
+					// handle multiline values 
+					for(var i = 1; i < valuelines.length; i++) {
+						html += "<div class='multiline-value " + flags.join(' ') + "'>"
+							+ "<span>" + valuelines[i] + "</span>"
+							+ "\n</div>";
+					}
+
+					return html;
 				}
 			}
 
@@ -285,6 +333,12 @@
 				document.getElementById('file2-text').value = file1Content;
 				if(!editMode) diff();
 			}
+
+			function clearAll() {
+				document.getElementById('file1-text').value = '';
+				document.getElementById('file2-text').value = '';
+				if(!editMode) diff();
+			}
 		</script>
 	</head>
 
@@ -301,11 +355,12 @@ prop1.subprop2=XYZ
 prop1.subprop3=123
 
 # Some more prop
-prop1.subprop4=1
-prop1.subprop5=2</textarea>
+prop2.subprop4=1
+prop2.subprop5=2</textarea>
 					<div class='output hide' id='file1-output'></div>
 				</td>
 				<td style='width: 10%;'>
+					<button id='clear-button' onclick='clearAll()'>Clear</button>
 					<button id='edit-button' onclick='edit()' disabled>Edit</button>
 					<button id='diff-button' onclick='diff()'>Show Difference</button>
 					<button id='swap-button' onclick='swap()'>Swap</button>
@@ -326,9 +381,9 @@ prop1.subprop1=ABC
 prop1.subprop2=PQR
 
 # Some more prop
-prop1.subprop4=1
-prop1.subprop5=2
-prop1.subprop6=3</textarea>
+prop2.subprop4=1
+prop2.subprop5=2
+prop2.subprop6=3</textarea>
 					<div class='output hide' id='file2-output'></div>
 				</td>
 			</tr>
