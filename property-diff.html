@@ -290,15 +290,24 @@
 				editMode = false;
 			}
 
+			function getKeyValue(line) {
+				if(line.match(/.*(:|=).*/)) {
+					var parts = line.split(/(^[^:=]*)(\s*:|=\s*)/);
+					return [parts[1], parts[3]];
+				} else {
+					return [line, ''];
+				}
+			}
+
 			function makeDiv(line, flags) {
 				if(flags == null) {
 					return "<div class='blank'></div>";
 				} else if(!line || line.startsWith("#")) {
 					return "<div class='" + flags.join(' ') + "'>" + line + "\n</div>";
 				} else {
-					var parts = line.split(/=|:/)
-					var key = parts.shift();
-					var valuelines = parts.join('=').split(/\n/);
+					var keyValue = getKeyValue(line);
+					var key = keyValue[0];
+					var valuelines = keyValue[1].split(/\n/);
 					html = "<div class='" + flags.join(' ') + "'>" 
 						+ "<span class='key'>" + key + "</span>"
 						+ "<span class='equals'>=</span>"
@@ -349,14 +358,20 @@
 		<table>
 			<tr>
 				<td style='width: 45%;'>
-					<textarea id='file1-text'># Some prop
+					<textarea id='file1-text'></textarea>
+					<!-- <textarea id='file1-text'># Some prop
 prop1.subprop1=ABC
-prop1.subprop2=XYZ
-prop1.subprop3=123
+prop1.subprop2=jdbc:postgresql://rakesh:malik@127.0.0.1:5432
+prop1.subprop3={ \
+	"x": "http://xyz.com" \
+	"y": "http://pqr.com" \
+}
+prop.subprop4
+prop.subprop5=asfghjk
 
 # Some more prop
-prop2.subprop4=1
-prop2.subprop5=2</textarea>
+prop2.subprop1=1
+prop2.subprop2=2</textarea> -->
 					<div class='output hide' id='file1-output'></div>
 				</td>
 				<td style='width: 10%;'>
@@ -376,14 +391,20 @@ prop2.subprop5=2</textarea>
 					</div>
 				</td>
 				<td style='width: 45%;'>
-					<textarea id='file2-text'># Some prop
+					<textarea id='file2-text'></textarea>
+					<!-- <textarea id='file2-text'># Some prop
 prop1.subprop1=ABC
-prop1.subprop2=PQR
+prop1.subprop2=jdbc:postgresql://rakesh:malik@127.0.0.1:5432
+prop1.subprop3={ \
+	"x": "http://xyz.com" \
+	"z": "http://pqr.com" \
+}
+prop.subprop4
 
 # Some more prop
-prop2.subprop4=1
-prop2.subprop5=2
-prop2.subprop6=3</textarea>
+prop2.subprop1=1
+prop2.subprop2=2
+prop2.subprop3=3</textarea> -->
 					<div class='output hide' id='file2-output'></div>
 				</td>
 			</tr>
