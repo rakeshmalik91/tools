@@ -192,6 +192,8 @@
 				return lines;
 			}
 
+			var sortByFlags = false;
+
 			function diff() {
 				var file1 = getLines('file1-text');
 				console.log("file1 = ", file1);
@@ -215,7 +217,7 @@
 
 				var dupli1 = new Set(), dupli2 = new Set();
 
-				var file1Html = '', file2Html = '';
+				var file1Data = [], file2Data = [];
 				for(var i1 = 0, i2 = 0; i1 < file1.length || i2 < file2.length; ) {
 
 					var line1 = (i1 < file1.length) ? trim(file1[i1]) : '';
@@ -273,10 +275,25 @@
 						dupli2.add(prop2);
 					}
 
-					file1Html += makeDiv(line1, flags1); 
-					file2Html += makeDiv(line2, flags2);
+					file1Data.push({line: line1, flags: flags1});
+					file2Data.push({line: line2, flags: flags2});
 				}
 
+				var file1Html = '', file2Html = '';
+
+				if(sortByFlags) {
+					file1Data = file1Data.filter(d => d.line && (d.flags||[]).length == 0)
+										.concat(file1Data.filter(d => (d.flags||[]).indexOf('modified') >= 0))
+										.concat(file1Data.filter(d => (d.flags||[]).indexOf('added') >= 0))
+										.concat(file1Data.filter(d => (d.flags||[]).indexOf('removed') >= 0));
+					file2Data = file2Data.filter(d => d.line && (d.flags||[]).length == 0)
+										.concat(file2Data.filter(d => (d.flags||[]).indexOf('modified') >= 0))
+										.concat(file2Data.filter(d => (d.flags||[]).indexOf('added') >= 0))
+										.concat(file2Data.filter(d => (d.flags||[]).indexOf('removed') >= 0));
+				}
+
+				file1Data.forEach(d => file1Html += makeDiv(d.line, d.flags));
+				file2Data.forEach(d => file2Html += makeDiv(d.line, d.flags));
 				document.getElementById('file1-output').innerHTML = file1Html;
 				document.getElementById('file2-output').innerHTML = file2Html;
 
@@ -286,6 +303,7 @@
 				}
 				document.getElementById('edit-button').removeAttribute('disabled');
 				document.getElementById('diff-button').setAttribute('disabled', true);
+				document.getElementById('sort-button').setAttribute('disabled', true);
 
 				editMode = false;
 			}
@@ -332,6 +350,7 @@
 				}
 				document.getElementById('edit-button').setAttribute('disabled', true);
 				document.getElementById('diff-button').removeAttribute('disabled');
+				document.getElementById('sort-button').removeAttribute('disabled');
 				editMode = true;
 			}
 
@@ -358,8 +377,8 @@
 		<table>
 			<tr>
 				<td style='width: 45%;'>
-					<textarea id='file1-text'></textarea>
-					<!-- <textarea id='file1-text'># Some prop
+					<!-- <textarea id='file1-text'></textarea> -->
+					<textarea id='file1-text'># Some prop
 prop1.subprop1=ABC
 prop1.subprop2=jdbc:postgresql://rakesh:malik@127.0.0.1:5432
 prop1.subprop3={ \
@@ -371,13 +390,14 @@ prop.subprop5=asfghjk
 
 # Some more prop
 prop2.subprop1=1
-prop2.subprop2=2</textarea> -->
+prop2.subprop2=2</textarea>
 					<div class='output hide' id='file1-output'></div>
 				</td>
 				<td style='width: 10%;'>
 					<button id='clear-button' onclick='clearAll()'>Clear</button>
 					<button id='edit-button' onclick='edit()' disabled>Edit</button>
-					<button id='diff-button' onclick='diff()'>Show Difference</button>
+					<button id='diff-button' onclick='sortByFlags=false;diff()'>Show Difference</button>
+					<button id='sort-button' onclick='sortByFlags=true;diff()'>Show Sorted Difference</button>
 					<button id='swap-button' onclick='swap()'>Swap</button>
 					<div class='credits'>
 						<br/>
@@ -391,8 +411,8 @@ prop2.subprop2=2</textarea> -->
 					</div>
 				</td>
 				<td style='width: 45%;'>
-					<textarea id='file2-text'></textarea>
-					<!-- <textarea id='file2-text'># Some prop
+					<!-- <textarea id='file2-text'></textarea> -->
+					<textarea id='file2-text'># Some prop
 prop1.subprop1=ABC
 prop1.subprop2=jdbc:postgresql://rakesh:malik@127.0.0.1:5432
 prop1.subprop3={ \
@@ -404,7 +424,7 @@ prop.subprop4
 # Some more prop
 prop2.subprop1=1
 prop2.subprop2=2
-prop2.subprop3=3</textarea> -->
+prop2.subprop3=3</textarea>
 					<div class='output hide' id='file2-output'></div>
 				</td>
 			</tr>
